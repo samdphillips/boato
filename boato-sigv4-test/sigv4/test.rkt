@@ -1,5 +1,7 @@
 #lang racket/base
+
 (require (for-syntax racket/base
+                     racket/exn
                      racket/format
                      racket/match
                      racket/port
@@ -39,12 +41,16 @@
              (list (mkstx (list 'quote (string->symbol name)))
                    (mkstx value))])))
       #`(hash #,@(mkstx (apply append hlist))))
-    (call-with-input-file filename
-      (λ (inp)
-        (define-values (mstx ustx) (read-request-line inp))
-        (define hstx (read-header-lines inp))
-        (define bstx (mkstx (port->bytes inp)))
-        #`(make-request #,mstx (string->url #,ustx) #,hstx #,bstx)))))
+    (with-handlers ([exn:fail? (λ (e) (raise-syntax-error
+                                       'req-file->req-syntax
+                                       (exn->string e)
+                                       stx))])
+      (call-with-input-file filename
+        (λ (inp)
+          (define-values (mstx ustx) (read-request-line inp))
+          (define hstx (read-header-lines inp))
+          (define bstx (mkstx (port->bytes inp)))
+          #`(make-request #,mstx (string->url #,ustx) #,hstx #,bstx))))))
 
 (define testsuite-date    #"20150830T123600")
 (define testsuite-region  #"us-east-1")
@@ -76,7 +82,32 @@
                                              testsuite-access-key
                                              testsuite-secret-key)
                          authz-stx
-                         "authorization")
-           ))]))
+                         "authorization")))]))
 
-(define-auth-test "get-vanilla")
+(module* test #f
+  #;(define-auth-test "get-header-key-duplicate")
+  #;(define-auth-test "get-header-value-multiline")
+  #;(define-auth-test "get-header-value-order")
+  ;;(define-auth-test "get-header-value-trim")
+  (define-auth-test "get-unreserved")
+  (define-auth-test "get-utf8")
+  (define-auth-test "get-vanilla")
+  (define-auth-test "get-vanilla-empty-query-key")
+  (define-auth-test "get-vanilla-query")
+  (define-auth-test "get-vanilla-query-order-encoded")
+  (define-auth-test "get-vanilla-query-order-key")
+  (define-auth-test "get-vanilla-query-order-key-case")
+  (define-auth-test "get-vanilla-query-order-value")
+  (define-auth-test "get-vanilla-query-unreserved")
+  (define-auth-test "get-vanilla-utf8-query")
+  #;(define-auth-test "get-vanilla-with-session-token")
+  #;(define-auth-test "normalize-path")
+  (define-auth-test "post-header-key-case")
+  (define-auth-test "post-header-key-sort")
+  (define-auth-test "post-header-value-case")
+  #;(define-auth-test "post-sts-token")
+  (define-auth-test "post-vanilla")
+  (define-auth-test "post-vanilla-empty-query-value")
+  (define-auth-test "post-vanilla-query")
+  (define-auth-test "post-x-www-form-urlencoded")
+  (define-auth-test "post-x-www-form-urlencoded-parameters"))

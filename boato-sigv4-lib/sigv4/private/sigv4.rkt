@@ -14,10 +14,6 @@
 (define-type Headers (Immutable-HashTable Bytes Bytes))
 (define-type Query (Listof (Pair Symbol (U #f String))))
 
-(require/typed racket/dict
-  [(dict-keys query-names) (-> Query (Listof Symbol))]
-  [(dict-ref  query-ref)   (-> Query Symbol (U #f String))])
-
 (require/typed crypto
   [hmac (-> Symbol Bytes Bytes Bytes)]
   [#:opaque Crypto-Factory crypto-factory?]
@@ -130,21 +126,41 @@
 (define (uri-encode->bytes s)
   (string->bytes/utf-8 (uri-encode s)))
 
+(define-type BF (Pair Bytes (U False Bytes)))
+(: ordered-fields? : BF BF -> Boolean)
+(define (ordered-fields? a b)
+  (define a0 (car a))
+  (define b0 (car b))
+  (cond
+    [(bytes<? a0 b0) #t]
+    [(bytes=? a0 b0)
+     (define a1 (cdr a))
+     (define b1 (cdr b))
+     (cond
+       [(not a1) #t]
+       [(not b1) #f]
+       [else
+        (bytes<? a1 b1)])]
+    [else #f]))
+
 (: canonical-uri-query : Request -> Bytes)
 (define (canonical-uri-query req)
   (define q (url-query (Request-url req)))
-  (define qn* (sort (query-names q) symbol<?))
-  (bytes-append
-    (bytes-join
-     (for/list ([qn (in-list qn*)])
-       (define v (query-ref q qn))
-       (if v
-           (bytes-append (uri-encode->bytes (symbol->string qn))
-                         #"="
-                         (uri-encode->bytes v))
-           (uri-encode->bytes (string-append (symbol->string qn) "="))))
-     #"&")
-    #"\n"))
+  (define encoded-fields
+    (for/list : (Listof (Pair Bytes (U False Bytes))) ([qp (in-list q)])
+      (define n (car qp))
+      (define v (cdr qp))
+      (if v
+          (cons (uri-encode->bytes (symbol->string n)) (uri-encode->bytes v))
+          (cons (uri-encode->bytes (string-append (symbol->string n) "=")) #f))))
+  (define sorted-fields
+    (for/list : (Listof Bytes) ((qp (in-list (sort encoded-fields ordered-fields?))))
+      (define n (car qp))
+      (define v (cdr qp))
+      (if v
+          (bytes-append n #"=" v)
+          n)))
+  (bytes-append (bytes-join sorted-fields #"&") #"\n"))
 
 (: canonical-headers : Request -> Bytes)
 (define (canonical-headers req)
