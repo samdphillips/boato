@@ -1,0 +1,31 @@
+on:
+  push:
+    branches:
+      - main
+      - release
+  pull_request:
+  schedule:
+  - cron: "17 19 * * THU"
+jobs:
+  test:
+    strategy:
+      matrix:
+        racket-variant: ["BC", "CS"]
+        racket-version: ["pre-release", "stable", "current"]
+    runs-on: ubuntu-latest
+    steps:
+    - name: checkout
+      uses: actions/checkout@master
+    - name: install racket
+      uses: Bogdanp/setup-racket@v1.9.1
+      with:
+        architecture: 'x64'
+        distribution: 'full'
+        variant: ${{ matrix.racket-variant }}
+        version: ${{ matrix.racket-version }}
+    - name: install lib package
+      run: raco pkg install --name boato-sigv4-lib --batch --auto ./boato-sigv4-lib
+    - name: check declared dependencies
+      run: raco setup --check-pkg-deps --unused-pkg-deps --pkgs boato-sigv4-lib
+    - name: run tests
+      run: raco test --drdr --package boato-sigv4-lib
