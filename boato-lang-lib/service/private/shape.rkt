@@ -1,109 +1,16 @@
 #lang racket/base
 
-(require (for-syntax json
-                     racket/base
-                     racket/match
+(require (for-syntax racket/base
                      racket/sequence
-                     racket/syntax)
+                     racket/syntax
+                     "shape-support.rkt")
          gregor
          racket/contract
-         syntax/parse/define)
+         syntax/parse/define
+         "contract.rkt"
+         "util.rkt")
 
 (provide (all-defined-out))
-
-(define (string/c #:min [n #f] #:max [m #f])
-  (define name
-    `(string/c ,@(if n `(#:min ,n) null)
-               ,@(if m `(#:max ,m) null)))
-  (flat-named-contract name
-                       (and/c string?
-                              (property/c string-length
-                                          (integer-in n m)))))
-
-(begin-for-syntax
-  (provide (all-defined-out))
-  (define-syntax-class hash-table
-    [pattern v
-      #:do [(define ht (syntax->datum #'v))]
-      #:when (hash? ht)
-      #:attr items (datum->syntax #'v (hash->list ht) #'v)])
-
-  (define (id->keyword i)
-    (define kw
-      (string->keyword
-       (symbol->string
-        (syntax->datum i))))
-    (datum->syntax i kw i))
-
-  (define (same-id? a b)
-    (equal? (syntax->datum a)
-            (syntax->datum b)))
-
-  (define-syntax-class simple-shape-type
-    [pattern "integer"]
-    [pattern "string"]
-    [pattern "timestamp"])
-
-  (struct shape-info (ctc) #:transparent)
-
-  (define (shape-contract v)
-    (shape-info-ctc (syntax-local-value v)))
-
-  (define-syntax-class shape
-    [pattern v
-      #:declare v (static shape-info? "shape identifier")])
-
-  (struct static-service-metadata (tbl) #:transparent)
-
-  (define-syntax-class service
-    [pattern v
-      #:declare v (static static-service-metadata? "service identifier")
-      #:with tbl  (static-service-metadata-tbl (syntax-local-value #'v))])
-
-  (struct static-operation-metadata (tbl) #:transparent)
-
-  (define-syntax-class operation
-    [pattern v
-      #:declare v (static static-operation-metadata? "operation identifier")
-      #:with tbl  (static-operation-metadata-tbl (syntax-local-value #'v))])
-  )
-
-(define-syntax-parser ht-expand
-  [(_ k:id (kargs ...) #:keywords? kw?:boolean ht:hash-table)
-   #:with ([keys . vals] ...) #'ht.items
-   #:with (kws ...) (for/list ([k (in-syntax #'(keys ...))]) (id->keyword k))
-   (if (syntax->datum #'kw?)
-       #'(k kargs ... (~@ kws vals) ...)
-       #'(k kargs ... [keys vals] ...))])
-
-;; debugging
-(define-syntax qls
-  (syntax-rules () [(_ . vs) 'vs]))
-
-(define-syntax-parser define-service-schema
-  [(_ filename:string)
-   #:with schema
-   (datum->syntax #'filename
-                  (with-input-from-file(syntax->datum #'filename) read-json)
-                  #'filename)
-   #'(define-service schema)])
-
-(define-syntax-parser define-service
-  [(_ v:hash-table) #'(ht-expand define-service () #:keywords? #t v)]
-  [(_ {~alt {~once {~seq #:operations    ops}}
-            {~once {~seq #:metadata      metadata:hash-table}}
-            {~once {~seq #:version       _}}
-            {~once {~seq #:shapes        shapes}}
-            {~once {~seq #:documentation _}}} ...)
-   #:do [(define service-id-str
-           (string-downcase
-            (hash-ref (syntax->datum #'metadata) 'serviceId)))]
-   #:with service-id (format-id #'metadata "~a-service" service-id-str)
-   #'(begin
-       (provide service-id)
-       (define-syntax service-id
-         (static-service-metadata 'metadata))
-       (define-service-shapes shapes))])
 
 (define-syntax-parser define-service-shapes
   [(_ v:hash-table) #'(ht-expand define-service-shapes () #:keywords? #f v)]
@@ -133,7 +40,14 @@
   [(_ shape-name
       {~alt {~once {~seq #:type type-name:simple-shape-type}}
             rest} ...)
-   #'(define-service-simple-shape shape-name type-name rest ...)])
+   #'(define-service-simple-shape shape-name type-name rest ...)]
+  [(_ shape-name
+      {~alt {~once {~seq #:type type-name:string}}
+            rest} ...)
+   (raise-syntax-error 'define-service-shape
+                       "unknown type name"
+                       this-syntax
+                       #'type-name)])
 
 (define-syntax-parser define-service-structure-shape
   [(_ name:id
@@ -151,6 +65,7 @@
    #'(define-service-structure-shape name
        #:members ([member-names member-shapes] ...)
        #:required (reqd ...))]
+
   [(_ name:id
       {~alt {~once {~seq #:members ([member-names member-shapes] ...)}}
             {~once {~seq #:required (required-members ...)}}} ...)
@@ -228,4 +143,3 @@
    #'(define-syntax name (shape-info #'(integer-in n m)))]
   [(_ name "timestamp")
    #'(define-syntax name (shape-info #'datetime-provider?))])
-

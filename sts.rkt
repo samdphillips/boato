@@ -42,5 +42,5 @@
 
 |#
 
-(require boato/service/private/syntax)
+(require boato/service/private/service)
 (define-service-schema "sts.json")
