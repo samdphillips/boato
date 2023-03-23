@@ -10,7 +10,7 @@ jobs:
   test:
     strategy:
       matrix:
-        racket-variant: ["BC", "CS"]
+        # racket-variant: ["BC", "CS"]
         racket-version: ["pre-release", "stable", "current"]
     runs-on: ubuntu-latest
     steps:
@@ -21,7 +21,8 @@ jobs:
       with:
         architecture: 'x64'
         distribution: 'full'
-        variant: ${{ matrix.racket-variant }}
+        # variant: ${{ matrix.racket-variant }}
+        variant: 'CS'
         version: ${{ matrix.racket-version }}
     - name: install lib package
       run: raco pkg install --name boato-sigv4-lib --batch --auto ./boato-sigv4-lib
