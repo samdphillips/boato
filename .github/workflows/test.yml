@@ -47,7 +47,7 @@ jobs:
         variant: ${{ matrix.racket-variant }}
         version: ${{ matrix.racket-version }}
     - name: install lib package
-      run: raco pkg install --name boato-sigv4-lib --batch --auto ./boato-lang-lib
+      run: raco pkg install --name boato-lang-lib --batch --auto ./boato-lang-lib
     - name: check declared dependencies
       run: raco setup --check-pkg-deps --unused-pkg-deps --pkgs boato-lang-lib
     - name: check sqs service compiles
