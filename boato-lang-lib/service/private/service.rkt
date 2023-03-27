@@ -5,33 +5,12 @@
                      racket/match
                      racket/sequence
                      racket/syntax
+                     "service-support.rkt"
                      "support.rkt")
          syntax/parse/define
          "shape.rkt")
 
 (provide (all-defined-out))
-
-(begin-for-syntax
-  (provide (all-defined-out))
-
-  (struct static-service-metadata (tbl) #:transparent)
-
-  (define-syntax-class service
-    [pattern v
-      #:declare v (static static-service-metadata? "service identifier")
-      #:with tbl  (static-service-metadata-tbl (syntax-local-value #'v))])
-
-  (struct static-operation-metadata (tbl) #:transparent)
-
-  (define-syntax-class operation
-    [pattern v
-      #:declare v (static static-operation-metadata? "operation identifier")
-      #:with tbl  (static-operation-metadata-tbl (syntax-local-value #'v))])
-  )
-
-;; debugging
-(define-syntax qls
-  (syntax-rules () [(_ . vs) 'vs]))
 
 (define-syntax-parser define-service-schema
   [(_ filename:string)
