@@ -4,26 +4,26 @@
                      racket/promise
                      racket/sequence
                      racket/syntax
-                     "shape-support.rkt")
+                     "shape-support.rkt"
+                     "support.rkt")
          gregor
          racket/contract
          syntax/parse/define
-         "contract.rkt"
-         "util.rkt")
+         "contract.rkt")
 
 (provide (all-defined-out))
 
 (define-syntax-parser define-service-shapes
-  [(_ v:hash-table)
-   #'(ht-expand define-service-shapes () #:keywords? #f v)]
-  [(_ [shape-name shape-descr] ...)
+  [(_ ht:hash-table)
+   #'(define-service-shapes ht.kv-pairs ...)]
+  [(_ [shape-name:id . shape-descr] ...)
    #'(begin
        (define-service-shape shape-name shape-descr) ...)])
 
 (define-syntax-parser define-service-shape
-  [(_ shape-name v:hash-table)
-   #'(ht-expand define-service-shape (shape-name) #:keywords? #t v)]
-  [(_ shape-name
+  [(_ shape-name:id ht:hash-table)
+   #'(define-service-shape shape-name ht.kw-seq ...)]
+  [(_ shape-name:id
       {~alt
        {~once {~seq #:type "structure"}}
        {~once {~seq #:exception #t}}
@@ -31,20 +31,20 @@
        rest} ...)
    #'(begin)
    #;#'(define-service-exception-shape shape-name rest ...)]
-  [(_ shape-name
+  [(_ shape-name:id
       {~alt
        {~once {~seq #:type "structure"}}
        (~optional {~seq #:documentation _})
        rest} ...)
    #'(define-service-structure-shape shape-name rest ...)]
-  [(_ shape-name {~alt {~once {~seq #:type "list"}} rest} ...)
+  [(_ shape-name:id {~alt {~once {~seq #:type "list"}} rest} ...)
    #'(define-service-list-shape shape-name rest ...)]
-  [(_ shape-name {~alt {~once {~seq #:type "map"}} rest} ...)
+  [(_ shape-name:id {~alt {~once {~seq #:type "map"}} rest} ...)
    #'(define-service-map-shape shape-name rest ...)]
-  [(_ shape-name
+  [(_ shape-name:id
       {~alt {~once {~seq #:type type-name:simple-shape-type}} rest} ...)
    #'(define-service-simple-shape shape-name type-name rest ...)]
-  [(_ shape-name {~alt {~once {~seq #:type type-name:string}} rest} ...)
+  [(_ shape-name:id {~alt {~once {~seq #:type type-name:string}} rest} ...)
    (raise-syntax-error 'define-service-shape
                        "unknown type name"
                        this-syntax
@@ -57,20 +57,18 @@
        {~optional
         {~seq #:required required-members}
         #:defaults ([required-members #'()])}} ...)
-   #:with ([member-names . member-tbl] ...) #'members.items
    #:with (member-shapes ...)
-   (for/list ([t (in-syntax #'(member-tbl ...))])
+   (for/list ([t (in-syntax #'(members.vs ...))])
      (datum->syntax t
                     (string->symbol
                       (hash-ref (syntax->datum t) 'shape))
                     t))
-   #:with
-   (reqd ...)
+   #:with (reqd ...)
    (for/list ([n (in-syntax #'required-members)])
      (datum->syntax n (string->symbol (syntax->datum n)) n))
    #'(define-service-structure-shape
       name
-      #:members ([member-names member-shapes] ...)
+      #:members ([members.ks member-shapes] ...)
       #:required (reqd ...))]
 
   [(_ name:id
@@ -134,8 +132,7 @@
 (define-syntax-parser define-service-list-shape
   [(_ name
       {~alt {~once {~seq #:member member-info:hash-table}} rest} ...)
-   #:with member-data #'member-info.items
-   #'(define-service-list-shape name #:member member-data rest ...)]
+   #'(define-service-list-shape name #:member (member-info.kv-pairs ...) rest ...)]
   [(_ name {~alt {~once {~seq #:member member:shape-member}} _} ...)
    #'(define-syntax name
        (list-shape-info
@@ -149,11 +146,9 @@
        {~once {~seq #:key key-info:hash-table}}
        {~once {~seq #:value value-info:hash-table}}
        rest} ...)
-   #:with key-data #'key-info.items
-   #:with value-data #'value-info.items
    #'(define-service-map-shape name
-                               #:key key-data
-                               #:value value-data
+                               #:key   (key-info.kv-pairs ...)
+                               #:value (value-info.kv-pairs ...)
                                rest ...)]
   [(_ name
       {~alt

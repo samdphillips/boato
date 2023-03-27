@@ -4,10 +4,10 @@
                      racket/base
                      racket/match
                      racket/sequence
-                     racket/syntax)
+                     racket/syntax
+                     "support.rkt")
          syntax/parse/define
-         "shape.rkt"
-         "util.rkt")
+         "shape.rkt")
 
 (provide (all-defined-out))
 
@@ -42,7 +42,7 @@
    #'(define-service schema)])
 
 (define-syntax-parser define-service
-  [(_ v:hash-table) #'(ht-expand define-service () #:keywords? #t v)]
+  [(_ ht:hash-table) #'(define-service ht.kw-seq ...)]
   [(_ {~alt {~once {~seq #:operations    ops}}
             {~once {~seq #:metadata      metadata:hash-table}}
             {~once {~seq #:version       _}}
