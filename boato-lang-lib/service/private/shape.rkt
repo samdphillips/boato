@@ -83,15 +83,18 @@
    #:with make-name (format-id #'name "make-~a" #'name)
    #:with (kws ...) (for/list ([n (in-syntax #'(member-names ...))])
                       (id->keyword n))
-   #:with (kwargs
-           ...) (let ([reqd (syntax->list #'(required-members ...))])
-                  (for/list ([n (in-syntax #'(member-names ...))])
-                    (if (member n reqd same-id?) #`#,n #`[#,n (void)])))
-   #:with ((pos acc-names)
-           ...) (for/list ([i (in-naturals)]
-                           [n (in-syntax #'(member-names ...))])
-                  (list (datum->syntax this-syntax i)
-                        (format-id n "~a-~a" #'name n)))
+   #:do [(define reqd (syntax->list #'(required-members ...)))]
+   #:with (kwargs ...)
+   (for/list ([n (in-syntax #'(member-names ...))])
+     (if (member n reqd same-id?) #`#,n #`[#,n (void)]))
+   #:with (member-requireds ...)
+   (for/list ([n (in-syntax #'(member-names ...))])
+     (if (member n reqd same-id?) #'#t #'#f))
+   #:with ((pos acc-names) ...)
+   (for/list ([i (in-naturals)]
+              [n (in-syntax #'(member-names ...))])
+     (list (datum->syntax this-syntax i)
+           (format-id n "~a-~a" #'name n)))
    #:do [(syntax-local-lift-module-end-declaration
           #'(provide-structure-shape-maker
              make-name
@@ -105,7 +108,13 @@
          (constr member-names ...))
        (define-values (acc-names ...)
          (values (make-struct-field-accessor acc pos 'member-names) ...))
-       (define-syntax name (struct-shape-info #'name?)))])
+       (define-syntax name
+         (struct-shape-info #'name?
+                            (list (struct-shape-member-info 'member-names
+                                                            member-requireds
+                                                            #'member-shapes
+                                                            #'acc-names)
+                                  ...))))])
 
 (define-syntax-parser provide-structure-shape-maker
   [(_ name:id
@@ -163,8 +172,8 @@
            #'(hash/c key-ctc val-ctc #:flat? #t)))))])
 
 (define-syntax-parser define-service-simple-shape
-  [(_ name "blob") #'(define-syntax name (shape-info #'bytes?))]
-  [(_ name "boolean") #'(define-syntax name (shape-info #'boolean?))]
+  [(_ name "blob") #'(define-syntax name (simple-shape-info #'bytes? 'blob))]
+  [(_ name "boolean") #'(define-syntax name (simple-shape-info #'boolean? 'boolean))]
   [(_ name
       "integer"
       {~alt
@@ -172,10 +181,10 @@
        {~optional {~seq #:max m} #:defaults ([m #'#f])}
        ;; #:box doesn't appear to be used in botocore so ignore it
        {~optional {~seq #:box _}}} ...)
-   #'(define-syntax name (shape-info #'(integer-in n m)))]
+   #'(define-syntax name (simple-shape-info #'(integer-in n m) 'integer))]
   ;; XXX eat the pattern argument.  Needs a conversion function from the
   ;; regexes used in the service document to Racket regexes
   [(_ name "string" {~alt {~optional {~seq #:pattern _}} rest} ...)
-   #'(define-syntax name (shape-info #'(string/c rest ...)))]
+   #'(define-syntax name (simple-shape-info #'(string/c rest ...) 'string))]
   [(_ name "timestamp")
-   #'(define-syntax name (shape-info #'datetime-provider?))])
+   #'(define-syntax name (simple-shape-info #'datetime-provider? 'timestamp))])

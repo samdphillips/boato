@@ -17,7 +17,9 @@
   [pattern "timestamp"])
 
 (struct shape-info (ctc))
-(struct struct-shape-info shape-info ())
+(struct simple-shape-info shape-info (type))
+(struct struct-shape-info shape-info (members))
+(struct struct-shape-member-info (name required? shape accessor))
 (struct list-shape-info shape-info ())
 (struct map-shape-info shape-info ())
 
@@ -26,8 +28,18 @@
 
 (define-syntax-class shape
   [pattern v
-    #:declare v (static shape-info? "shape identifier")])
+    #:declare v (static shape-info? "shape")])
+
+(define-syntax-class simple-shape
+  [pattern v
+    #:declare v (static simple-shape-info? "simple shape")
+    #:attr type (simple-shape-info-type (attribute v.value))])
+
+(define-syntax-class struct-shape
+  [pattern v
+    #:declare v (static struct-shape-info? "struct shape")
+    #:attr members (struct-shape-info-members (attribute v.value))])
 
 (define-syntax-class shape-member
   [pattern [{~alt {~once ({~literal shape} . shape-str:string)} _} ...]
-           #:with shape (datum->syntax #'shape-str (string->symbol (syntax->datum #'shape-str)))])
+    #:with shape (datum->syntax #'shape-str (string->symbol (syntax->datum #'shape-str)))])
