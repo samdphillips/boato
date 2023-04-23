@@ -13,6 +13,11 @@
 
 (provide (all-defined-out))
 
+(define-syntax-parser define-shape-syntax
+  ([_ name:id rhs]
+   (quasisyntax/loc this-syntax
+     (define-syntax #,(in-shape-space #'name) rhs))))
+
 (define-syntax-parser define-service-shapes
   [(_ ht:hash-table)
    #'(define-service-shapes ht.kv-pairs ...)]
@@ -108,7 +113,7 @@
          (constr member-names ...))
        (define-values (acc-names ...)
          (values (make-struct-field-accessor acc pos 'member-names) ...))
-       (define-syntax name
+       (define-shape-syntax name
          (struct-shape-info #'name?
                             (list (struct-shape-member-info 'member-names
                                                             member-requireds
@@ -141,9 +146,10 @@
 (define-syntax-parser define-service-list-shape
   [(_ name
       {~alt {~once {~seq #:member member-info:hash-table}} rest} ...)
-   #'(define-service-list-shape name #:member (member-info.kv-pairs ...) rest ...)]
+   #'(define-service-list-shape name
+       #:member (member-info.kv-pairs ...) rest ...)]
   [(_ name {~alt {~once {~seq #:member member:shape-member}} _} ...)
-   #'(define-syntax name
+   #'(define-shape-syntax name
        (list-shape-info
         (delay
          (with-syntax ([member-ctc (shape-contract #'member.shape)])
@@ -164,7 +170,7 @@
        {~once {~seq #:key key-member:shape-member}}
        {~once {~seq #:value val-member:shape-member}}
        _} ...)
-   #'(define-syntax name
+   #'(define-shape-syntax name
        (map-shape-info
         (delay
          (with-syntax ([key-ctc (shape-contract #'key-member.shape)]
@@ -172,8 +178,10 @@
            #'(hash/c key-ctc val-ctc #:flat? #t)))))])
 
 (define-syntax-parser define-service-simple-shape
-  [(_ name "blob") #'(define-syntax name (simple-shape-info #'bytes? 'blob))]
-  [(_ name "boolean") #'(define-syntax name (simple-shape-info #'boolean? 'boolean))]
+  [(_ name "blob")
+   #'(define-shape-syntax name (simple-shape-info #'bytes? 'blob))]
+  [(_ name "boolean")
+   #'(define-shape-syntax name (simple-shape-info #'boolean? 'boolean))]
   [(_ name
       "integer"
       {~alt
@@ -181,10 +189,13 @@
        {~optional {~seq #:max m} #:defaults ([m #'#f])}
        ;; #:box doesn't appear to be used in botocore so ignore it
        {~optional {~seq #:box _}}} ...)
-   #'(define-syntax name (simple-shape-info #'(integer-in n m) 'integer))]
+   #'(define-shape-syntax name
+       (simple-shape-info #'(integer-in n m) 'integer))]
   ;; XXX eat the pattern argument.  Needs a conversion function from the
   ;; regexes used in the service document to Racket regexes
   [(_ name "string" {~alt {~optional {~seq #:pattern _}} rest} ...)
-   #'(define-syntax name (simple-shape-info #'(string/c rest ...) 'string))]
+   #'(define-shape-syntax name
+       (simple-shape-info #'(string/c rest ...) 'string))]
   [(_ name "timestamp")
-   #'(define-syntax name (simple-shape-info #'datetime-provider? 'timestamp))])
+   #'(define-shape-syntax name
+       (simple-shape-info #'datetime-provider? 'timestamp))])
