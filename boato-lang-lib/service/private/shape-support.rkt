@@ -2,6 +2,7 @@
 
 (require (for-syntax racket/base
                      syntax/parse)
+         (for-template racket/base)
          racket/promise
          syntax/parse)
 
@@ -61,7 +62,11 @@
 (define-syntax-class struct-shape
   [pattern v:shape
     #:fail-unless (struct-shape-info? (attribute v.value)) "struct shape name"
-    #:attr members (struct-shape-info-members (attribute v.value))])
+    #:attr (members 1)
+    (for/list ([m (in-list (struct-shape-info-members (attribute v.value)))])
+      #`(#,(symbol->string (struct-shape-member-info-name m))
+         #,(struct-shape-member-info-shape m)
+         #,(struct-shape-member-info-accessor m)))])
 
 (define-syntax-class list-shape
   [pattern v:shape

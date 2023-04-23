@@ -46,12 +46,7 @@
   [(_ shp:map-shape prefix ser v)
    #'(serialize/query-map shp prefix ser v)]
   [(_ shp:struct-shape prefix ser v)
-   #:with (members ...)
-   (for/list ([m (in-list (attribute shp.members))])
-     (list #`#,(symbol->string (struct-shape-member-info-name m))
-           (struct-shape-member-info-shape m)
-           (struct-shape-member-info-accessor m)))
-   #'(serialize/query-struct-members (members ...) prefix ser v)])
+   #'(serialize/query-struct-members (shp.members ...) prefix ser v)])
 
 (define-syntax-parser serialize/query-struct-members
   [(_ () prefix ser v) #'ser]
