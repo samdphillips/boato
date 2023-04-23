@@ -2,8 +2,11 @@
 
 (require (for-syntax racket/base
                      racket/promise
+                     racket/list
                      racket/sequence
                      racket/syntax
+                     syntax/parse/lib/function-header
+                     syntax/struct
                      "shape-support.rkt"
                      "support.rkt")
          gregor
@@ -55,13 +58,27 @@
                        this-syntax
                        #'type-name)])
 
+(begin-for-syntax
+  (define (build-required-list ids reqd)
+    (for/list ([n (in-list ids)])
+       (and (member n reqd same-id?) #t)))
+
+  (define (generate-kw-formals ids reqd)
+    (append*
+      (for/list ([id   (in-list ids)]
+                 [req? (in-list reqd)])
+        (define kw (id->keyword id))
+        (define arg (generate-temporary id))
+        (if req?
+            (list kw arg)
+            (list kw #`[#,arg (void)]))))))
+
 (define-syntax-parser define-service-structure-shape
   [(_ name:id
       {~alt
        {~once {~seq #:members members:hash-table}}
-       {~optional
-        {~seq #:required required-members}
-        #:defaults ([required-members #'()])}} ...)
+       {~optional {~seq #:required required-members}
+                  #:defaults ([required-members #'()])}} ...)
    #:with (member-shapes ...)
    (for/list ([t (in-syntax #'(members.vs ...))])
      (datum->syntax t
@@ -80,47 +97,38 @@
       {~alt
        {~once {~seq #:members ([member-names member-shapes] ...)}}
        {~once {~seq #:required (required-members ...)}}} ...)
-   #:with struct-name (format-id #'name "struct:~a" #'name)
-   #:with name? (format-id #'name "~a?" #'name)
-   #:with num-fields (datum->syntax
-                      this-syntax
-                      (length (syntax->datum #'(member-names ...))))
-   #:with make-name (format-id #'name "make-~a" #'name)
-   #:with (kws ...) (for/list ([n (in-syntax #'(member-names ...))])
-                      (id->keyword n))
-   #:do [(define reqd (syntax->list #'(required-members ...)))]
-   #:with (kwargs ...)
-   (for/list ([n (in-syntax #'(member-names ...))])
-     (if (member n reqd same-id?) #`#,n #`[#,n (void)]))
-   #:with (member-requireds ...)
-   (for/list ([n (in-syntax #'(member-names ...))])
-     (if (member n reqd same-id?) #'#t #'#f))
-   #:with ((pos acc-names) ...)
-   (for/list ([i (in-naturals)]
-              [n (in-syntax #'(member-names ...))])
-     (list (datum->syntax this-syntax i)
-           (format-id n "~a-~a" #'name n)))
-   #:do [(syntax-local-lift-module-end-declaration
-          #'(provide-structure-shape-maker
-             make-name
-             name?
-             ([kws member-names member-shapes] ...)
-             (required-members ...)))]
+   #:do [(define member-names-stx (syntax-e #'(member-names ...)))
+         (define reqd
+           (build-required-list member-names-stx
+                                (syntax-e #'(required-members ...))))]
+   #:with (member-requireds ...) (datum->syntax #'(required-members ...) reqd)
+   #:with ctor (format-id #'name "mk-~a" #'name)
+   #:with make (format-id #'name "make-~a" #'name)
+   #:with struct-names
+   (build-struct-names #'name member-names-stx #:constructor-name #'ctor #f #t)
+   #:with (_ _ name? member-refs ...) #'struct-names
+   #:with mk-struct
+   (datum->syntax #'name
+                  (build-struct-generation #'name
+                                           member-names-stx
+                                           #:constructor-name #'ctor
+                                           #f #t))
+   #:with kw+args:formals
+   (generate-kw-formals member-names-stx reqd)
    #'(begin
-       (define-values (struct-name constr name? acc mut)
-         (make-struct-type 'name #f num-fields 0))
-       (define (make-name {~@ kws kwargs} ...)
-         (constr member-names ...))
-       (define-values (acc-names ...)
-         (values (make-struct-field-accessor acc pos 'member-names) ...))
+       (define-values struct-names mk-struct)
+       (define (make . kw+args) (ctor . kw+args.params))
        (define-shape-syntax name
          (struct-shape-info #'name?
-                            (list (struct-shape-member-info 'member-names
-                                                            member-requireds
-                                                            #'member-shapes
-                                                            #'acc-names)
-                                  ...))))])
+                            (list
+                             (struct-shape-member-info 'member-names
+                                                       member-requireds
+                                                       #'member-shapes
+                                                       #'member-refs)
+                             ...))))])
 
+;; XXX: add this back in
+#;
 (define-syntax-parser provide-structure-shape-maker
   [(_ name:id
       name?:id
