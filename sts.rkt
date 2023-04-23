@@ -11,6 +11,7 @@
                      boato/service/private/service-support
                      boato/service/private/shape-support)
          boato/service/private/shape
+         racket/format
          racket/string
          syntax/parse/define)
 
@@ -39,6 +40,10 @@
   [(_ shp:simple-shape prefix ser v)
    #:with convert (type->string (attribute shp.type))
    #'(cons (cons (make-prefix . prefix) (convert v)) ser)]
+  [(_ shp:list-shape prefix ser v)
+   #'(if (null? v)
+         (cons (cons (make-prefix . prefix) "") ser)
+         (serialize/query-list shp prefix ser v))]
   [(_ shp:struct-shape (prefix ...) ser v)
    #:with (members ...)
    (for/list ([m (in-list (attribute shp.members))])
@@ -50,6 +55,7 @@
 (define-syntax-parser serialize/query-struct-members
   [(_ () prefix ser v) #'ser]
   [(_ ([name shp:shape ref] members ...) (prefix ...) ser v)
+   ;; XXX: if a member is required this can omit the `void?` check
    #'(let ([nser (let ([mv (ref v)])
                    (if (void? mv)
                        ser
@@ -58,10 +64,16 @@
                                        (prefix ...)
                                        nser
                                        v))])
-#;
-(define-syntax-parser make-prefix
-  [(_ vs:string ...)
-   #`'#,(string->symbol (string-join (syntax->datum #'(vs ...)) "."))])
+
+(define-syntax-parser serialize/query-list
+  [(_ shp:list-shape (prefix ...) ser v)
+   ;; XXX: handle flattened and/or serializations with named members.  Would
+   ;; need to add information to list-shape-info.
+   #'(for/fold ([nser ser])
+               ([n (in-naturals)]
+                [elem (in-list v)])
+       (define i (~a n))
+       (serialize/query shp.member-shape (prefix ... "member" i) nser elem))])
 
 (define-syntax-parser make-prefix
   [(_ parts ...) #'(make-prefix-aux () (parts ...))])
@@ -100,28 +112,15 @@
 (define-service-list-shape tagListType
   #:member [(shape . "Tag")])
 
-#|
-(define-values (struct:Tag mk-Tag Tag? Tag-acc Tag-mut)
-  (make-struct-type 'Tag #f 2 0))
-(define (make-Tag #:Key key #:Value value) (mk-Tag key value))
-(define-values (Tag-Key Tag-Value)
-  (values (make-struct-field-accessor Tag-acc 0 'Key)
-          (make-struct-field-accessor Tag-acc 1 'Value)))
-(define-syntax Tag
-  (struct-shape-info #'Tag?
-                     (list
-                      (struct-shape-member-info 'Key #t #'tagKeyType #'Tag-Key)
-                      (struct-shape-member-info 'Value #t #'tagValueType #'Tag-Value))))
-|#
-
-
 (define tag (make-Tag #:Key "mykey" #:Value "myvalue"))
 
 (let ([ser null])
   (serialize/query Tag ("tag") ser tag))
 
-#;#;
-(define tag* (list tag))
-(let ([ser null])
-  (serialize/query tagListType (tags) ser tag*))
+(define tag*
+  (list tag
+        (make-Tag #:Key "name" #:Value "sam")
+        (make-Tag #:Key "lang" #:Value "Racket")))
 
+(let ([ser null])
+  (serialize/query tagListType ("tags") ser tag*))

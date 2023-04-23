@@ -161,7 +161,8 @@
        (list-shape-info
         (delay
          (with-syntax ([member-ctc (shape-contract #'member.shape)])
-           #'(listof member-ctc)))))])
+           #'(listof member-ctc)))
+        #'member.shape))])
 
 (define-syntax-parser define-service-map-shape
   [(_ name
