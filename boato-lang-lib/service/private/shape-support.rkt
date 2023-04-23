@@ -28,9 +28,9 @@
 
 (define-syntax shape-quote
   (syntax-parser
-    [(name:id)
+    [(_ name:id)
      #`(quote-syntax
-        #,((make-interned-syntax-introducer 'boato/shape #'name)))]))
+        #,((make-interned-syntax-introducer 'boato/shape) #'name))]))
 
 (define (syntax-shape-local-value id
                                   [missing (λ ()
