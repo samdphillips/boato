@@ -65,6 +65,7 @@
     #:attr (members 1)
     (for/list ([m (in-list (struct-shape-info-members (attribute v.value)))])
       #`(#,(symbol->string (struct-shape-member-info-name m))
+         #,(struct-shape-member-info-required? m)
          #,(struct-shape-member-info-shape m)
          #,(struct-shape-member-info-accessor m)))])
 

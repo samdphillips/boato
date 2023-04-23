@@ -40,26 +40,32 @@
    #:with convert (type->string (attribute shp.type))
    #'(cons (cons (make-prefix . prefix) (convert v)) ser)]
   [(_ shp:list-shape prefix ser v)
-   #'(if (null? v)
+   #'(let ([list-v v])
+       (if (null? list-v)
          (cons (cons (make-prefix . prefix) "") ser)
-         (serialize/query-list shp prefix ser v))]
+         (serialize/query-list shp prefix ser list-v)))]
   [(_ shp:map-shape prefix ser v)
    #'(serialize/query-map shp prefix ser v)]
   [(_ shp:struct-shape prefix ser v)
-   #'(serialize/query-struct-members (shp.members ...) prefix ser v)])
+   #'(let ([struct-v v])
+       (serialize/query-struct-members (shp.members ...) prefix ser struct-v))])
 
 (define-syntax-parser serialize/query-struct-members
   [(_ () prefix ser v) #'ser]
-  [(_ ([name shp:shape ref] members ...) (prefix ...) ser v)
-   ;; XXX: if a member is required this can omit the `void?` check
-   #'(let ([nser (let ([mv (ref v)])
-                   (if (void? mv)
-                       ser
-                       (serialize/query shp (prefix ... name) ser mv)))])
-       (serialize/query-struct-members (members ...)
+  [(_ ([name #f shp ref] . members) (prefix ...) ser v)
+   #'(let ([cur-ser ser])
+       (serialize/query-struct-members members
                                        (prefix ...)
-                                       nser
-                                       v))])
+                                       (let ([member-v (ref v)])
+                                         (if (void? member-v)
+                                              cur-ser
+                                              (serialize/query shp (prefix ... name) cur-ser member-v)))
+                                       v))]
+  [(_ ([name #t shp:shape ref] . members) (prefix ...) ser v)
+   #'(serialize/query-struct-members members
+                                     (prefix ...)
+                                     (serialize/query shp (prefix ... name) ser (ref v))
+                                     v)])
 
 (define-syntax-parser serialize/query-list
   [(_ shp:list-shape (prefix ...) ser v)
