@@ -184,7 +184,9 @@
         (delay
          (with-syntax ([key-ctc (shape-contract #'key-member.shape)]
                        [val-ctc (shape-contract #'val-member.shape)])
-           #'(hash/c key-ctc val-ctc #:flat? #t)))))])
+           #'(hash/c key-ctc val-ctc #:flat? #t)))
+        #'key-member.shape
+        #'val-member.shape))])
 
 (define-syntax-parser define-service-simple-shape
   [(_ name "blob")

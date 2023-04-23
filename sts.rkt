@@ -11,7 +11,6 @@
                      boato/service/private/service-support
                      boato/service/private/shape-support)
          boato/service/private/shape
-         racket/format
          racket/string
          syntax/parse/define)
 
@@ -43,13 +42,15 @@
    #'(if (null? v)
          (cons (cons (make-prefix . prefix) "") ser)
          (serialize/query-list shp prefix ser v))]
-  [(_ shp:struct-shape (prefix ...) ser v)
+  [(_ shp:map-shape prefix ser v)
+   #'(serialize/query-map shp prefix ser v)]
+  [(_ shp:struct-shape prefix ser v)
    #:with (members ...)
    (for/list ([m (in-list (attribute shp.members))])
      (list #`#,(symbol->string (struct-shape-member-info-name m))
            (struct-shape-member-info-shape m)
            (struct-shape-member-info-accessor m)))
-   #'(serialize/query-struct-members (members ...) (prefix ...) ser v)])
+   #'(serialize/query-struct-members (members ...) prefix ser v)])
 
 (define-syntax-parser serialize/query-struct-members
   [(_ () prefix ser v) #'ser]
@@ -71,8 +72,20 @@
    #'(for/fold ([nser ser])
                ([n (in-naturals)]
                 [elem (in-list v)])
-       (define i (~a n))
+       (define i (number->string n))
        (serialize/query shp.member-shape (prefix ... "member" i) nser elem))])
+
+(define-syntax-parser serialize/query-map
+  [(_ shp:map-shape (prefix ...) ser v)
+   ;; XXX: handle flattened and/or serializations with named members.  Would
+   ;; need to add information to map-shape-info.
+   #'(for/fold ([nser ser])
+               ([n (in-naturals)]
+                [(keyv valv) (in-hash v)])
+       (define i (number->string n))
+       (define kser
+         (serialize/query shp.key-shape (prefix ... "entry" i "key") nser keyv))
+       (serialize/query shp.value-shape (prefix ... "entry" i "value") kser valv))])
 
 (define-syntax-parser make-prefix
   [(_ parts ...) #'(make-prefix-aux () (parts ...))])
@@ -105,6 +118,10 @@
 (define-service-list-shape tagListType
   #:member [(shape . "Tag")])
 
+(define-service-map-shape tagMapType
+  #:key ([shape . "tagKeyType"])
+  #:value ([shape . "tagValueType"]))
+
 (define tag (make-Tag #:Key "mykey" #:Value "myvalue"))
 
 (let ([ser null])
@@ -117,3 +134,11 @@
 
 (let ([ser null])
   (serialize/query tagListType ("tags") ser tag*))
+
+(define tag**
+  (hash "mykey" "myvalue"
+        "name" "sam"
+        "lang" "Racket"))
+
+(let ([ser null])
+  (serialize/query tagMapType ("tags") ser tag**))

@@ -16,7 +16,7 @@
 (struct struct-shape-info shape-info (members))
 (struct struct-shape-member-info (name required? shape accessor))
 (struct list-shape-info shape-info (member-shape))
-(struct map-shape-info shape-info ())
+(struct map-shape-info shape-info (key-shape value-shape))
 
 (define (shape-contract v)
   (force (shape-info-ctc (syntax-shape-local-value v))))
@@ -67,6 +67,12 @@
   [pattern v:shape
     #:fail-unless (list-shape-info? (attribute v.value)) "list shape name"
     #:attr member-shape (list-shape-info-member-shape (attribute v.value))])
+
+(define-syntax-class map-shape
+  [pattern v:shape
+    #:fail-unless (map-shape-info? (attribute v.value)) "map shape name"
+    #:attr key-shape (map-shape-info-key-shape (attribute v.value))
+    #:attr value-shape (map-shape-info-value-shape (attribute v.value))])
 
 (define-syntax-class shape-member
   [pattern [{~alt {~once ({~literal shape} . shape-str:string)} _} ...]
