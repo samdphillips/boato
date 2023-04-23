@@ -1,6 +1,5 @@
 #lang racket/base
 
-#;#;
 (require boato/service/private/service)
 (define-service-schema "sts.json")
 
@@ -17,8 +16,10 @@
 
 (define-for-syntax (type->string type)
   (match type
-    ['string  #'values]
+    ['string  #'identity]
     ['integer #'number->string]))
+
+(define-syntax-rule (identity v) v)
 
 (define-syntax-parser serialize
   [(_ svc:service op shp v)
@@ -32,7 +33,7 @@
    #:with version (hash-ref (syntax->datum (attribute svc.tbl)) 'apiVersion)
    #:with action (hash-ref (syntax->datum (attribute op.tbl)) 'name)
    #'(let ([ser '((Action . action) (Version . version))])
-       (serialize/query shape v ser))])
+       (serialize/query shape () ser v))])
 
 (define-syntax-parser serialize/query
   [(_ shp:simple-shape prefix ser v)
@@ -101,13 +102,13 @@
    #'(make-prefix-aux done (new . rest))]
   [(_ (done ...) (a . rest)) #'(make-prefix-aux (done ... a) rest)])
 
-#|
 (define-syntax AssumeRole
   (static-operation-metadata (hash 'name "AssumeRole")))
 
-(serialize sts-service AssumeRole AssumeRoleRequest v)
-|#
+(define (doit v)
+  (serialize sts-service AssumeRole AssumeRoleRequest v))
 
+#|
 (define-service-simple-shape tagKeyType "string")
 (define-service-simple-shape tagValueType "string")
 
@@ -142,3 +143,4 @@
 
 (let ([ser null])
   (serialize/query tagMapType ("tags") ser tag**))
+|#
