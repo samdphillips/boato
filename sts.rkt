@@ -16,11 +16,10 @@
          syntax/parse/define)
 
 
-(begin-for-syntax
-  (define (type->string type)
-    (match type
-      ['string  #'values]
-      ['integer #'number->string])))
+(define-for-syntax (type->string type)
+  (match type
+    ['string  #'values]
+    ['integer #'number->string]))
 
 (define-syntax-parser serialize
   [(_ svc:service op shp v)
@@ -47,7 +46,7 @@
   [(_ shp:struct-shape (prefix ...) ser v)
    #:with (members ...)
    (for/list ([m (in-list (attribute shp.members))])
-     (list #`#,(symbol->string (struct-shape-member-info-name m)) 
+     (list #`#,(symbol->string (struct-shape-member-info-name m))
            (struct-shape-member-info-shape m)
            (struct-shape-member-info-accessor m)))
    #'(serialize/query-struct-members (members ...) (prefix ...) ser v)])
@@ -89,18 +88,12 @@
    #'(make-prefix-aux done (new . rest))]
   [(_ (done ...) (a . rest)) #'(make-prefix-aux (done ... a) rest)])
 
-#;#;#;
-(define i "0")
-(make-prefix "a" "b" i "c")
-(make-prefix "a" "b" "c")
-
 #|
 (define-syntax AssumeRole
   (static-operation-metadata (hash 'name "AssumeRole")))
 
 (serialize sts-service AssumeRole AssumeRoleRequest v)
 |#
-
 
 (define-service-simple-shape tagKeyType "string")
 (define-service-simple-shape tagValueType "string")
