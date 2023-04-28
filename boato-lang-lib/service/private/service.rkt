@@ -20,6 +20,11 @@
                   #'filename)
    #'(define-service schema)])
 
+(define-syntax-parser define-service-syntax
+  ([_ name:id rhs]
+   (quasisyntax/loc this-syntax
+     (define-syntax #,(in-service-space #'name) rhs))))
+
 (define-syntax-parser define-service
   [(_ ht:hash-table) #'(define-service ht.kw-seq ...)]
   [(_ {~alt {~once {~seq #:operations    ops}}
@@ -32,8 +37,5 @@
             (hash-ref (syntax->datum #'metadata) 'serviceId)))]
    #:with service-id (format-id #'metadata "~a-service" service-id-str)
    #'(begin
-       (provide service-id)
-       (define-syntax service-id
-         (static-service-metadata 'metadata))
+       (define-service-syntax service-id (service-metadata 'metadata))
        (define-service-shapes shapes))])
-
