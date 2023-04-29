@@ -26,17 +26,11 @@
                                                 id))])
   (syntax-local-value (in-service-space id) missing))
 
-(struct service-metadata (tbl) #:transparent)
+(struct service-info (tbl endpoint-resolver) #:transparent)
 
 (define-syntax-class service
   [pattern v:id
-   #:do [(define lvalue (syntax-service-local-value #'v (λ () #f)))]
-   #:fail-unless (and lvalue (service-metadata? lvalue)) "service name"
-   #:with tbl (service-metadata-tbl lvalue)])
-
-(struct static-operation-metadata (tbl) #:transparent)
-
-(define-syntax-class operation
-  [pattern v
-    #:declare v (static static-operation-metadata? "operation identifier")
-    #:with tbl  (static-operation-metadata-tbl (syntax-local-value #'v))])
+    #:do [(define lvalue (syntax-service-local-value #'v (λ () #f)))]
+    #:fail-unless (and lvalue (service-info? lvalue)) "service name"
+    #:with tbl (service-info-tbl lvalue)
+    #:with endpoint-resolver (service-info-endpoint-resolver lvalue)])

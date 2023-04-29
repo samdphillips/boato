@@ -5,24 +5,31 @@
                      racket/base
                      racket/match
                      racket/string)
-         syntax/parse/define
-         racket/string)
+         net/uri-codec
+         racket/string
+         syntax/parse/define)
 
 (provide serialize/query-top)
 
 (define-syntax-parser serialize/query-top
-  [(_ svc:service op:operation shape v)
+  [(_ svc:service [op-name:string http] shape v)
    #:with version (hash-ref (syntax->datum (attribute svc.tbl)) 'apiVersion)
-   #:with action (hash-ref (syntax->datum (attribute op.tbl)) 'name)
-   #'(let ([ser '((Action . action) (Version . version))])
-       (serialize/query shape () ser v))])
+   #:with [http-method http-path]
+   (syntax-parse #'http
+     [({~alt {~once {~seq #:method method:string}}
+             {~once {~seq #:requestUri path:string}}} ...)
+      #'(method path)])
+   #'(let* ([ser '((Action . op-name) (Version . version))]
+            [ser (serialize/query shape () ser v)])
+       (values http-path
+               http-method
+               #hasheq([content-type . "application/x-www-form-urlencoded; charset=utf-8"])
+               (string->bytes/utf-8 (alist->form-urlencoded ser))))])
 
 (define-for-syntax (type->string type)
   (match type
-    ['string  #'identity]
+    ['string  #'#%expression]
     ['integer #'number->string]))
-
-(define-syntax-rule (identity v) v)
 
 (define-syntax-parser serialize/query
   [(_ shp:simple-shape prefix ser v)

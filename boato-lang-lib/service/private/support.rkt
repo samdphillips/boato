@@ -12,9 +12,12 @@
     #:with (kv-pairs ...) (datum->syntax #'v (hash->list ht) #'v)
     #:with ([ks . vs] ...) #'(kv-pairs ...)
     #:with (kws ...) (for/list ([k (in-syntax #'(ks ...))]) (id->keyword k))
-    #:with (kw-seq ...) #'({~@ kws vs} ...)
-    #;#;#;
-    #:attr items (datum->syntax #'v (hash->list ht) #'v)])
+    #:with (kw-seq ...) #'({~@ kws vs} ...)])
+
+(define-syntax-class part
+  [pattern ({~alt {~once {~seq #:shape shape-str:string}} _} ...)
+    #:with shape
+    (datum->syntax #'shape-str (string->symbol (syntax->datum #'shape-str)))])
 
 (define (id->keyword i)
   (define kw
