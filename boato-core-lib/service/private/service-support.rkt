@@ -33,4 +33,5 @@
     #:do [(define lvalue (syntax-service-local-value #'v (λ () #f)))]
     #:fail-unless (and lvalue (service-info? lvalue)) "service name"
     #:with tbl (service-info-tbl lvalue)
-    #:with endpoint-resolver (service-info-endpoint-resolver lvalue)])
+    #:with endpoint-resolver (service-info-endpoint-resolver lvalue)
+    #:with name (string-downcase (hash-ref (syntax->datum #'tbl) 'serviceId #f))])

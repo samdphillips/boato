@@ -14,15 +14,16 @@
 (define-syntax-parser serialize/query-top
   [(_ svc:service [op-name:string http] shape v)
    #:with version (hash-ref (syntax->datum (attribute svc.tbl)) 'apiVersion)
-   #:with [http-method http-path]
+   #:with [http-method-str http-path]
    (syntax-parse #'http
      [({~alt {~once {~seq #:method method:string}}
              {~once {~seq #:requestUri path:string}}} ...)
       #'(method path)])
+   #:with http-method (string->symbol (syntax-e #'http-method-str))
    #'(let* ([ser '((Action . op-name) (Version . version))]
             [ser (serialize/query shape () ser v)])
        (values http-path
-               http-method
+               'http-method
                #hasheq([content-type . "application/x-www-form-urlencoded; charset=utf-8"])
                (string->bytes/utf-8 (alist->form-urlencoded ser))))])
 
@@ -55,7 +56,10 @@
                                        (let ([member-v (ref v)])
                                          (if (void? member-v)
                                               cur-ser
-                                              (serialize/query shp (prefix ... name) cur-ser member-v)))
+                                              (serialize/query shp
+                                                               (prefix ... name)
+                                                               cur-ser
+                                                               member-v)))
                                        v))]
   [(_ ([name #t shp:shape ref] . members) (prefix ...) ser v)
    #'(serialize/query-struct-members members

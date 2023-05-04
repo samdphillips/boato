@@ -3,9 +3,13 @@
 (require (for-syntax racket/base
                      "service-support.rkt"
                      "support.rkt")
+         boato/credential
+         boato/endpoint
          net/url-string
+         net/http-easy
          racket/pretty
          syntax/parse/define
+         "http.rkt"
          "ser.rkt"
          "util.rkt")
 
@@ -41,7 +45,11 @@
             {~once {~seq #:input input:part}}
             (~once (~seq #:output _))
             {~once {~seq #:errors _}}} ...)
-   #'(define (op-name inv #:endpoint [endpoint (service.endpoint-resolver)])
+   #'(define (op-name inv
+                      #:session  [session  (current-session)]
+                      #:auth     [auth     (current-aws-credential)]
+                      #:region   [region   (aws-region)]
+                      #:endpoint [endpoint (service.endpoint-resolver)])
        (unless (or (string? endpoint)
                    (url? endpoint))
          (raise-arguments-error 'op-name
@@ -51,4 +59,4 @@
          (op-path op-method op-hdrs op-body)
          (serialize service (name http) input.shape inv))
        (define op-url (combine-url/relative (->url endpoint) op-path))
-       (values op-url op-method op-hdrs op-body))])
+       (boato-request session auth 'service.name region op-url op-method op-hdrs op-body))])
